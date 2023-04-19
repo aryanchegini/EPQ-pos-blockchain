@@ -1,6 +1,5 @@
-const {Participator, Tx} = require("../index");
+const { Participator, Tx } = require("../index");
 const SHA256 = require("crypto-js/sha256");
-
 
 class Block {
   constructor(index, transactions, previousHash = "", validator) {
@@ -77,11 +76,7 @@ class PoSBlockchain {
   }
 
   validatePendingTransactions(validatorAddress) {
-    const rewardTx = new Tx(
-      null,
-      validatorAddress,
-      this.validationReward
-    );
+    const rewardTx = new Tx(null, validatorAddress, this.validationReward);
     this.pendingTransactions.push(rewardTx);
 
     let block = new Block(

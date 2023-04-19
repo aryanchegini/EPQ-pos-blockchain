@@ -1,6 +1,5 @@
-const {Participator, Tx} = require("../index");
+const { Participator, Tx } = require("../index");
 const SHA256 = require("crypto-js/sha256");
-
 
 class Block {
   constructor(index, transactions, previousHash = "", miner) {
@@ -51,7 +50,7 @@ class PoWBlockchain {
     this.miningReward = 100;
     this.difficulty = 4;
   }
-  
+
   createGenesisBlock(participant) {
     let coinbase = new Tx(null, participant.publicKey, 1000);
     let genesisBlock = new Block(0, [coinbase], "0", participant.publicKey);
@@ -96,20 +95,16 @@ class PoWBlockchain {
 
   mineBlock(miner) {
     if (!this.pendingTransactions.length < 4) {
-      const rewardTx = new Tx(
-        null,
-        miner.publicKey,
-        this.miningReward
-      );
+      const rewardTx = new Tx(null, miner.publicKey, this.miningReward);
       this.pendingTransactions.push(rewardTx);
-  
+
       let block = new Block(
         this.chain.length,
         this.pendingTransactions,
         this.latestBlock.hash,
         miner.publicKey
       );
-  
+
       if (!block.validTransactions()) {
         for (let trans of block.transactions) {
           if (!trans.isValid()) {
@@ -117,13 +112,18 @@ class PoWBlockchain {
           }
         }
       }
-  
+
       block.mine(this.difficulty);
       this.chain.push(block);
-      console.log("Block mined and added to blockchain succesfully. Miners address: " + miner.publicKey)
+      console.log(
+        "Block mined and added to blockchain succesfully. Miners address: " +
+          miner.publicKey
+      );
       this.pendingTransactions = [];
     } else {
-      throw new Error("There are not enough pending transactions for a new block to be mined");
+      throw new Error(
+        "There are not enough pending transactions for a new block to be mined"
+      );
     }
   }
 
