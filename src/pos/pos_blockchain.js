@@ -1,75 +1,6 @@
+const {Participator, Tx} = require("../index");
 const SHA256 = require("crypto-js/sha256");
-const EC = require("elliptic").ec;
-const ec = new EC("secp256k1");
 
-class Participator {
-  constructor(blockchain) {
-    this.key = ec.genKeyPair();
-    //private variable
-    this._blockchain = blockchain;
-  }
-
-  get publicKey() {
-    return this.key.getPublic("hex");
-  }
-
-  get privateKey() {
-    return this.key.getPrivate("hex");
-  }
-
-  get balance() {
-    return this._blockchain.getBalanceOfAddress(this.publicKey);
-  }
-
-  stakeCoins(amount) {
-    if (amount > this.balance) {
-      throw new Error("You can not stake more coins that you have");
-    }
-
-    if (amount === 0) {
-      throw new Error("You can not stake 0 coins");
-    }
-
-    if (!(this.publicKey in this._blockchain.stakedCoins)) {
-      this._blockchain.stakedCoins[this.publicKey] = amount;
-    } else if (this.publicKey in this._blockchain.stakedCoins) {
-      this._blockchain.stakedCoins[this.publicKey] += amount;
-    }
-  }
-}
-
-class Tx {
-  constructor(fromAddress, toAddress, amount) {
-    this.fromAddress = fromAddress;
-    this.toAddress = toAddress;
-    this.amount = amount;
-  }
-
-  hashTx() {
-    return SHA256(this.fromAddress + this.toAddress + this.amount).toString();
-  }
-
-  signTx(signingKey) {
-    if (signingKey.getPublic("hex") !== this.fromAddress) {
-      throw new Error("You can not sign transactions for other wallets");
-    }
-
-    const hashTx = this.hashTx();
-    const sig = signingKey.sign(hashTx, "base64");
-    this.signature = sig.toDER("hex");
-  }
-
-  isValid() {
-    if (this.fromAddress === null) return true;
-
-    if (!this.fromAddress || this.signature.length === 0) {
-      throw new Error("No signature in this transaction");
-    }
-
-    const publicKey = ec.keyFromPublic(this.fromAddress, "hex");
-    return publicKey.verify(this.hashTx(), this.signature);
-  }
-}
 
 class Block {
   constructor(index, transactions, previousHash = "", validator) {
@@ -87,7 +18,6 @@ class Block {
         this.previousHash +
         this.timestamp +
         JSON.stringify(this.transactions) +
-        this.nonce +
         this.validator
     ).toString();
   }
@@ -102,45 +32,54 @@ class Block {
   }
 }
 
-class Blockchain {
+class PoSBlockchain {
   constructor() {
-    this.chain = [];
-    this.pendingTransactions = [];
     this.participators = [];
+    this.chain = [this.createGenesisBlock(this.createParticipator("p1"))];
+    this.pendingTransactions = [];
     this.stakedCoins = {};
     this.validationReward = 100;
-  }
-
-  createParticipator(name) {
-    name = new Participator(this);
-    this.participators.push(name.publicKey);
-    return name;
-  }
-
-  get participants() {
-    return this.participators;
-  }
-
-  printParticipantsBalance() {
-    for (let address of this.participators) {
-      console.log(address + " : " + this.getBalanceOfAddress(address));
-    }
   }
 
   createGenesisBlock(participant) {
     let coinbase = new Tx(null, participant.publicKey, 1000);
     let genesisBlock = new Block(0, [coinbase], "0", participant.publicKey);
-    this.chain.push(genesisBlock);
+    return genesisBlock;
+  }
+
+  createParticipator(name) {
+    name = new Participator();
+    this.participators.push(name);
+    return name;
+  }
+
+  getParticipatorsStakedCoins(participator) {
+    for (let address in this.stakedCoins) {
+      if (participator.publicKey === address) {
+        return this.stakedCoins[address];
+      }
+    }
+    return 0;
+  }
+
+  printParticipantsBalance() {
+    for (let participant of this.participators) {
+      console.log(
+        participant.publicKey +
+          " : " +
+          this.getBalanceOfAddress(participant.publicKey)
+      );
+    }
   }
 
   get latestBlock() {
     return this.chain[this.chain.length - 1];
   }
 
-  validatePendingTransactions(validatorRewardAddress) {
+  validatePendingTransactions(validatorAddress) {
     const rewardTx = new Tx(
       null,
-      validatorRewardAddress,
+      validatorAddress,
       this.validationReward
     );
     this.pendingTransactions.push(rewardTx);
@@ -149,7 +88,7 @@ class Blockchain {
       this.chain.length,
       this.pendingTransactions,
       this.latestBlock.hash,
-      validatorRewardAddress
+      validatorAddress
     );
 
     if (!block.validTransactions()) {
@@ -193,7 +132,7 @@ class Blockchain {
 
     let validatorAddress = pool[i];
 
-    console.log("\nThe validator's address is" + validatorAddress + "\n");
+    console.log("\nThe validator's address is " + validatorAddress + "\n");
     this.validatePendingTransactions(validatorAddress);
   }
 
@@ -219,6 +158,28 @@ class Blockchain {
       console.time("this.selectValidator");
       this.selectValidator();
       console.timeEnd("this.selectValidator");
+    }
+  }
+
+  makeTx(from, to, amount) {
+    let tx = new Tx(from.publicKey, to.publicKey, amount);
+    tx.signTx(from.key);
+    this.addTransaction(tx);
+  }
+
+  stakeCoins(participator, amount) {
+    if (amount > this.getBalanceOfAddress(participator.publicKey)) {
+      throw new Error("You can not stake more coins that you have");
+    }
+
+    if (amount === 0) {
+      throw new Error("You can not stake 0 coins");
+    }
+
+    if (!(participator.publicKey in this.stakedCoins)) {
+      this.stakedCoins[participator.publicKey] = amount;
+    } else if (participator.publicKey in this.stakedCoins) {
+      this.stakedCoins[participator.publicKey] += amount;
     }
   }
 
@@ -267,6 +228,4 @@ class Blockchain {
   }
 }
 
-module.exports.Blockchain = Blockchain;
-module.exports.Tx = Tx;
-module.exports.Participator = Participator;
+module.exports.PoSBlockchain = PoSBlockchain;
