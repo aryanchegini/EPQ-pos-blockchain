@@ -1,4 +1,5 @@
-const { Participator, Tx } = require("../index");
+const { Participator } = require("./participator");
+const { Tx } = require("./transaction");
 const SHA256 = require("crypto-js/sha256");
 
 class Block {

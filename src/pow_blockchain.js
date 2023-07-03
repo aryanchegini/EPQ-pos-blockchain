@@ -1,4 +1,5 @@
-const { Participator, Tx } = require("../index");
+const { Participator } = require("./participator");
+const { Tx } = require("./transaction");
 const SHA256 = require("crypto-js/sha256");
 
 class Block {
@@ -86,7 +87,24 @@ class PoWBlockchain {
 
     this.pendingTransactions.push(transaction);
   }
+  
+  getBalanceOfAddress(address) {
+    let balance = 0;
+    for (const block of this.chain) {
+      for (const trans of block.transactions) {
+        if (trans.fromAddress === address) {
+          balance -= trans.amount;
+        }
 
+        if (trans.toAddress === address) {
+          balance += trans.amount;
+        }
+      }
+    }
+
+    return balance;
+  }
+  
   makeTx(from, to, amount) {
     let tx = new Tx(from.publicKey, to.publicKey, amount);
     tx.signTx(from.key);
@@ -127,22 +145,6 @@ class PoWBlockchain {
     }
   }
 
-  getBalanceOfAddress(address) {
-    let balance = 0;
-    for (const block of this.chain) {
-      for (const trans of block.transactions) {
-        if (trans.fromAddress === address) {
-          balance -= trans.amount;
-        }
-
-        if (trans.toAddress === address) {
-          balance += trans.amount;
-        }
-      }
-    }
-
-    return balance;
-  }
 
   isChainValid() {
     for (let i = 1; i < this.chain.length; i++) {
